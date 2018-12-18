@@ -1,4 +1,6 @@
 # gvisor-containerd-shim
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fgoogle%2Fgvisor-containerd-shim.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fgoogle%2Fgvisor-containerd-shim?ref=badge_shield)
+
 
 gvisor-containerd-shim is a containerd shim for [gVisor](https://github.com/google/gvisor/). It implements the containerd v1 shim API. It can be used as a drop-in replacement for [containerd-shim](https://github.com/containerd/containerd/tree/master/cmd/containerd-shim) (though containerd-shim must still be installed). It allows the use of both gVisor (runsc) and normal containers in the same containerd installation by deferring to the runc shim if the desired runtime engine is not runsc.
 
@@ -123,3 +125,7 @@ EOL
 ```
 $ sudo crictl runp --runtime=runsc sandbox.json
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fgoogle%2Fgvisor-containerd-shim.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fgoogle%2Fgvisor-containerd-shim?ref=badge_large)
