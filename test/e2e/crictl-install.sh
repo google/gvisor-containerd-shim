@@ -2,6 +2,8 @@
 
 # A sample script for installing crictl.
 
+set -ex
+
 { # Step 1: Download crictl
 wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.13.0/crictl-v1.13.0-linux-amd64.tar.gz
 tar xf crictl-v1.13.0-linux-amd64.tar.gz

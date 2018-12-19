@@ -1,9 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 # A sample script to run a container in an existing pod
 
+set -ex
+
 { # Step 1: Create nginx container config
-$ cat <<EOF | tee container.json
+cat <<EOF | tee container.json
 {
   "metadata": {
       "name": "nginx"

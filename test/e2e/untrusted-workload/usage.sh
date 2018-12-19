@@ -3,14 +3,14 @@
 # A sample script for testing the gvisor-containerd-shim # using untrusted
 # workload extension.
 
-. ./install-crictl.sh
+set -ex
 
 { # Step 1: Pull the nginx image
 sudo crictl pull nginx
 }
 
 { # Step 2: Create sandbox.json
-$ cat <<EOF | tee sandbox.json
+cat <<EOF | tee sandbox.json
 {
     "metadata": {
         "name": "nginx-sandbox",

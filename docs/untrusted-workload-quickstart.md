@@ -7,6 +7,11 @@ later.
 *Note: The untrusted workload CRI extension is deprecated by containerd. If you
 are using containerd 1.2, please consider using runtime handler.*
 
+## Requirements
+
+- **runsc**: See the [gVisor documentation](https://github.com/google/gvisor) for information on how to install runsc.
+- **containerd**: See the [containerd website](https://containerd.io/) for information on how to install containerd.
+
 ## Install
  
 ### Install gvisor-containerd-shim
@@ -14,27 +19,28 @@ are using containerd 1.2, please consider using runtime handler.*
 1. Download the latest release of the `gvisor-containerd-shim`. See the
    [releases page](https://github.com/google/gvisor-containerd-shim/releases)
 
-[embedmd]:# (scripts/shim-install.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Download gvisor-containerd-shim
-wget -O gvisor-containerd-shim $(wget -qO - https://api.github.com/repos/google/gvisor-containerd-shim/releases | grep -oP '(?<="browser_download_url": ")https://[^"]*' | head -1)
+LATEST_RELEASE=$(wget -qO - https://api.github.com/repos/google/gvisor-containerd-shim/releases | grep -oP '(?<="browser_download_url": ")https://[^"]*' | head -1)
+wget -O gvisor-containerd-shim
 chmod +x gvisor-containerd-shim
 }
 ```
 
 2. Copy the binary to the desired directory:
 
-[embedmd]:# (scripts/shim-install.sh shell /{ # Step 2/ /^}/)
+[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 2/ /^}/)
 ```shell
 { # Step 2: Copy the binary to the desired directory
-mv gvisor-containerd-shim-* /usr/local/bin/gvisor-containerd-shim
+sudo mv gvisor-containerd-shim-* /usr/local/bin/gvisor-containerd-shim
 }
 ```
 
 3. Create the configuration for the gvisor shim in
    `/etc/containerd/gvisor-containerd-shim.yaml`:
 
-[embedmd]:# (scripts/shim-install.sh shell /{ # Step 3/ /^}/)
+[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 3/ /^}/)
 ```shell
 { # Step 3: Create the gvisor-containerd-shim.yaml
 cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.yaml
@@ -49,7 +55,7 @@ EOF
 1. Update `/etc/containerd/config.toml`. Be sure to update the path to
    `gvisor-containerd-shim` and `runsc` if necessary:
 
-[embedmd]:# (scripts/untrusted-workload-install.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/untrusted-workload/install.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Create containerd config.toml
 cat <<EOF | sudo tee /etc/containerd/config.toml
@@ -67,11 +73,8 @@ EOF
 
 2. Restart `containerd`
 
-[embedmd]:# (scripts/untrusted-workload-install.sh shell /{ # Step 2/ /^}/)
 ```shell
-{ # Step 2: Restart containerd
 sudo systemctl restart containerd
-}
 ```
 
 ## Usage
@@ -82,7 +85,7 @@ You can run containers in gVisor via containerd's CRI.
 
 1. Download and install the crictl binary:
 
-[embedmd]:# (scripts/crictl-install.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/crictl-install.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Download crictl
 wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.13.0/crictl-v1.13.0-linux-amd64.tar.gz
@@ -93,7 +96,7 @@ sudo mv crictl /usr/local/bin
 
 2. Write the crictl configuration file
 
-[embedmd]:# (scripts/crictl-install.sh shell /{ # Step 2/ /^}/)
+[embedmd]:# (../test/e2e/crictl-install.sh shell /{ # Step 2/ /^}/)
 ```shell
 { # Step 2: Configure crictl
 cat <<EOF | sudo tee /etc/crictl.yaml
@@ -106,7 +109,7 @@ EOF
 
 1. Pull the nginx image
 
-[embedmd]:# (scripts/untrusted-workload-usage.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Pull the nginx image
 sudo crictl pull nginx
@@ -115,10 +118,10 @@ sudo crictl pull nginx
 
 2. Create the sandbox creation request
 
-[embedmd]:# (scripts/untrusted-workload-usage.sh shell /{ # Step 2/ /^EOF\n}/)
+[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 2/ /^EOF\n}/)
 ```shell
 { # Step 2: Create sandbox.json
-$ cat <<EOF | tee sandbox.json
+cat <<EOF | tee sandbox.json
 {
     "metadata": {
         "name": "nginx-sandbox",
@@ -139,7 +142,7 @@ EOF
 
 3. Create the pod in gVisor
 
-[embedmd]:# (scripts/untrusted-workload-usage.sh shell /{ # Step 3/ /^}/)
+[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 3/ /^}/)
 ```shell
 { # Step 3: Create the sandbox
 SANDBOX_ID=$(sudo crictl runp sandbox.json)
@@ -150,10 +153,10 @@ SANDBOX_ID=$(sudo crictl runp sandbox.json)
 
 1. Create the nginx container creation request
 
-[embedmd]:# (scripts/run-container.sh shell /{ # Step 1/ /^EOF\n}/)
+[embedmd]:# (../test/e2e/run-container.sh shell /{ # Step 1/ /^EOF\n}/)
 ```shell
 { # Step 1: Create nginx container config
-$ cat <<EOF | tee container.json
+cat <<EOF | tee container.json
 {
   "metadata": {
       "name": "nginx"
@@ -171,7 +174,7 @@ EOF
 
 2. Create the nginx container
 
-[embedmd]:# (scripts/run-container.sh shell /{ # Step 2/ /^}/)
+[embedmd]:# (../test/e2e/run-container.sh shell /{ # Step 2/ /^}/)
 ```shell
 { # Step 2: Create nginx container
 CONTAINER_ID=$(sudo crictl create ${SANDBOX_ID} container.json sandbox.json)
@@ -180,9 +183,38 @@ CONTAINER_ID=$(sudo crictl create ${SANDBOX_ID} container.json sandbox.json)
 
 3. Start the nginx container
 
-[embedmd]:# (scripts/run-container.sh shell /{ # Step 3/ /^}/)
+[embedmd]:# (../test/e2e/run-container.sh shell /{ # Step 3/ /^}/)
 ```shell
 { # Step 3: Start nginx container
 sudo crictl start ${CONTAINER_ID}
+}
+```
+
+### Validate the container
+
+1. Inspect the created pod
+
+[embedmd]:# (../test/e2e/validate.sh shell /{ # Step 1/ /^}/)
+```shell
+{ # Step 1: Inspect the pod
+sudo crictl inspectp ${SANDBOX_ID}
+}
+```
+
+2. Inspect the nginx container
+
+[embedmd]:# (../test/e2e/validate.sh shell /{ # Step 2/ /^}/)
+```shell
+{ # Step 2: Inspect the container
+sudo crictl inspect ${CONTAINER_ID}
+}
+```
+
+3. Verify that nginx is running in gVisor
+
+[embedmd]:# (../test/e2e/validate.sh shell /{ # Step 3/ /^}/)
+```shell
+{ # Step 3: Check dmesg
+sudo crictl exec ${CONTAINER_ID} dmesg | grep -i gvisor
 }
 ```
