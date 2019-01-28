@@ -1,11 +1,8 @@
-# Untrusted Workload Quickstart
+# Runtime Handler Quickstart (Shim V2)
 
-This document describes how to install and run the `gvisor-containerd-shim`
-using the untrusted workload CRI extension. This requires containerd 1.1 or
+This document describes how to install and run the `containerd-shim-runsc-v1`
+using the containerd runtime handler support. This requires containerd 1.2 or
 later.
-
-*Note: The untrusted workload CRI extension is deprecated by containerd. If you
-are using containerd 1.2, please consider using runtime handler.*
 
 ## Requirements
 
@@ -14,51 +11,32 @@ are using containerd 1.2, please consider using runtime handler.*
 
 ## Install
 
-### Install gvisor-containerd-shim
+### Install containerd-shim-runsc-v1
 
-1. Download the latest release of the `gvisor-containerd-shim`. See the
-   [releases page](https://github.com/google/gvisor-containerd-shim/releases)
+1. Build and install `containerd-shim-runsc-v1`.
 
-[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 1\(dev\)/ /^}/)
 ```shell
-{ # Step 1(release): Install gvisor-containerd-shim
-LATEST_RELEASE=$(wget -qO - https://api.github.com/repos/google/gvisor-containerd-shim/releases | grep -oP '(?<="browser_download_url": ")https://[^"]*' | head -1)
-wget -O gvisor-containerd-shim
-chmod +x gvisor-containerd-shim
-sudo mv gvisor-containerd-shim /usr/local/bin/gvisor-containerd-shim
-}
-```
-
-2. Create the configuration for the gvisor shim in
-   `/etc/containerd/gvisor-containerd-shim.yaml`:
-
-[embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 2/ /^}/)
-```shell
-{ # Step 2: Create the gvisor-containerd-shim.yaml
-cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.yaml
-# This is the path to the default runc containerd-shim.
-runc_shim = "/usr/local/bin/containerd-shim"
-EOF
+{ # Step 1(dev): Build and install gvisor-containerd-shim and containerd-shim-runsc-v1
+    make
+    sudo make install
 }
 ```
 
 ### Configure containerd
 
-1. Update `/etc/containerd/config.toml`. Be sure to update the path to
-   `gvisor-containerd-shim` and `runsc` if necessary:
+1. Update `/etc/containerd/config.toml`. Make sure `containerd-shim-runsc-v1` is
+   in `${PATH}`.
 
-[embedmd]:# (../test/e2e/untrusted-workload/install.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/runtime-handler-shim-v2/install.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Create containerd config.toml
 cat <<EOF | sudo tee /etc/containerd/config.toml
 disabled_plugins = ["restart"]
 [plugins.linux]
-  shim = "/usr/local/bin/gvisor-containerd-shim"
   shim_debug = true
-[plugins.cri.containerd.untrusted_workload_runtime]
-  runtime_type = "io.containerd.runtime.v1.linux"
-  runtime_engine = "/usr/local/bin/runsc"
-  runtime_root = "/run/containerd/runsc"
+[plugins.cri.containerd.runtimes.runsc]
+  runtime_type = "io.containerd.runsc.v1"
 EOF
 }
 ```
@@ -101,7 +79,7 @@ EOF
 
 1. Pull the nginx image
 
-[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 1/ /^}/)
+[embedmd]:# (../test/e2e/runtime-handler/usage.sh shell /{ # Step 1/ /^}/)
 ```shell
 { # Step 1: Pull the nginx image
 sudo crictl pull nginx
@@ -110,7 +88,7 @@ sudo crictl pull nginx
 
 2. Create the sandbox creation request
 
-[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 2/ /^EOF\n}/)
+[embedmd]:# (../test/e2e/runtime-handler/usage.sh shell /{ # Step 2/ /^EOF\n}/)
 ```shell
 { # Step 2: Create sandbox.json
 cat <<EOF | tee sandbox.json
@@ -120,9 +98,6 @@ cat <<EOF | tee sandbox.json
         "namespace": "default",
         "attempt": 1,
         "uid": "hdishd83djaidwnduwk28bcsb"
-    },
-    "annotations": {
-      "io.kubernetes.cri.untrusted-workload": "true"
     },
     "linux": {
     },
@@ -134,10 +109,10 @@ EOF
 
 3. Create the pod in gVisor
 
-[embedmd]:# (../test/e2e/untrusted-workload/usage.sh shell /{ # Step 3/ /^}/)
+[embedmd]:# (../test/e2e/runtime-handler/usage.sh shell /{ # Step 3/ /^}/)
 ```shell
 { # Step 3: Create the sandbox
-SANDBOX_ID=$(sudo crictl runp sandbox.json)
+SANDBOX_ID=$(sudo crictl runp --runtime runsc sandbox.json)
 }
 ```
 
