@@ -31,3 +31,4 @@ set -ex
 
 # Validate the pod and container
 . ./test/e2e/validate.sh
+. ./test/e2e/runtime-handler-shim-v2/validate.sh

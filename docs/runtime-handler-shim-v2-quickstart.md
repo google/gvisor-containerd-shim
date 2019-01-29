@@ -1,8 +1,7 @@
 # Runtime Handler Quickstart (Shim V2)
 
-This document describes how to install and run the `containerd-shim-runsc-v1`
-using the containerd runtime handler support. This requires containerd 1.2 or
-later.
+This document describes how to install and run `containerd-shim-runsc-v1` using
+the containerd runtime handler support. This requires containerd 1.2 or later.
 
 ## Requirements
 
@@ -15,6 +14,7 @@ later.
 
 1. Build and install `containerd-shim-runsc-v1`.
 
+<!-- TODO: Use a release once we have one available. -->
 [embedmd]:# (../test/e2e/shim-install.sh shell /{ # Step 1\(dev\)/ /^}/)
 ```shell
 { # Step 1(dev): Build and install gvisor-containerd-shim and containerd-shim-runsc-v1
