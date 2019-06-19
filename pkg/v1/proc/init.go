@@ -234,7 +234,7 @@ func (p *Init) start(ctx context.Context) error {
 		return p.runtimeError(err, "OCI runtime start failed")
 	}
 	go func() {
-		status, err := p.runtime.Wait(context.Background(), p.id)
+		status, err := p.runtime.Wait(context.Background(), p.id, nil)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to wait for container %q", p.id)
 			// TODO(random-liu): Handle runsc kill error.
