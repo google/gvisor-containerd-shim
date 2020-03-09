@@ -7,6 +7,7 @@ the containerd runtime handler support. This requires containerd 1.2 or later.
 
 - **runsc**: See the [gVisor documentation](https://github.com/google/gvisor) for information on how to install runsc.
 - **containerd**: See the [containerd website](https://containerd.io/) for information on how to install containerd.
+- **CNI plugins**: Install [CNI plugins](https://github.com/containernetworking/plugins). You can install it via the [install-cni](https://github.com/containerd/containerd/blob/master/script/setup/install-cni) script.
 
 ## Install
 
