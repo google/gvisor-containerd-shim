@@ -1,10 +1,10 @@
-dist: trusty
+dist: bionic
 sudo: required
 language: go
 go: "1.14.x"
 
 env:
-  - CONTAINERD_VERSION=1.1.5 RUNSC_VERSION=release/20200219.0 TEST=untrusted-workload
+  - CONTAINERD_VERSION=1.1.8 RUNSC_VERSION=release/20200219.0 TEST=untrusted-workload
   - CONTAINERD_VERSION=1.2.13 RUNSC_VERSION=release/20200219.0 TEST=untrusted-workload
   - CONTAINERD_VERSION=1.2.13 RUNSC_VERSION=release/20200219.0 TEST=runtime-handler
   - CONTAINERD_VERSION=1.2.13 RUNSC_VERSION=release/20200219.0 TEST=runtime-handler-shim-v2
@@ -19,11 +19,10 @@ addons:
       - socat
       - conntrack
       - ipset
+      - libseccomp-dev
 
 before_install:
   - uname -r
-  - sudo apt-get -q update
-  - sudo apt-get install -y libseccomp-dev/trusty-backports
 
 script:
   - make test
