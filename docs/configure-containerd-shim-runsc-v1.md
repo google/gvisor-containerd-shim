@@ -1,11 +1,9 @@
 # Configure containerd-shim-runsc-v1 (Shim V2)
 
 This document describes how to configure runtime options for
-`containerd-shim-runsc-v1`.  This is follows on to the instructions of \[Runtime
-Handler Quick Start (shim v2) (containerd
-
-> =1.2)](runtime-handler-shim-v2-quickstart.md) and requires containerd 1.3 or
-> later.
+`containerd-shim-runsc-v1`.  This is follows on to the instructions of
+[Runtime Handler Quick Start (shim v2) (containerd >=1.2)](runtime-handler-shim-v2-quickstart.md)
+and requires containerd 1.3 or later.
 
 ### Update `/etc/containerd/config.toml` to point to a configuration file for `containerd-shim-runsc-v1`.
 
@@ -38,8 +36,8 @@ The set of options that can be configured can be found in
 gVisor enables the use of a number of platforms. This example shows how to
 configure `containerd-shim-runsc-v1` to use gvisor with the KVM platform.
 
-Find out more about platform in teh (gVisor
-documentation)[https://gvisor.dev/docs/user_guide/platforms/].
+Find out more about platform in the
+(gVisor documentation)[https://gvisor.dev/docs/user_guide/platforms/].
 
 ```shell
 cat <<EOF | sudo tee /etc/containerd/runsc.toml
@@ -54,8 +52,8 @@ gVisor debug logging can be enabled by setting the `debug` and `debug-log`
 flag. The shim will replace "%ID%" with the container ID in the path of the
 `debug-log` flag.
 
-Find out more about debugging in the (gVisor
-documentation)[https://gvisor.dev/docs/user_guide/debugging/].
+Find out more about debugging in the
+(gVisor documentation)[https://gvisor.dev/docs/user_guide/debugging/].
 
 ```shell
 cat <<EOF | sudo tee /etc/containerd/runsc.toml

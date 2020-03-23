@@ -12,8 +12,8 @@ The shim configuration is stored in `/etc/containerd/gvisor-containerd-shim.toml
 gVisor enables the use of a number of platforms. This configuration enables the
 KVM platform.
 
-Find out more about platform in teh (gVisor
-documentation)[https://gvisor.dev/docs/user_guide/platforms/].
+Find out more about platform in the
+(gVisor documentation)[https://gvisor.dev/docs/user_guide/platforms/].
 
 ```shell
 cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.toml
@@ -28,8 +28,8 @@ gVisor debug logging can be enabled by setting the `debug` and `debug-log`
 flag. The shim will replace "%ID%" with the container ID in the path of the
 `debug-log` flag.
 
-Find out more about debugging in the (gVisor
-documentation)[https://gvisor.dev/docs/user_guide/debugging/].
+Find out more about debugging in the
+(gVisor documentation)[https://gvisor.dev/docs/user_guide/debugging/].
 
 ```shell
 cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.toml
