@@ -30,20 +30,21 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/cgroups"
+	cgroups "github.com/containerd/cgroups/stats/v1"
 	"github.com/containerd/console"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	rproc "github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
+	"github.com/containerd/containerd/sys/reaper"
 	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -74,23 +75,22 @@ var _ = (taskAPI.TaskService)(&service{})
 const configFile = "config.toml"
 
 // New returns a new shim service that can be used via GRPC
-func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
-	ctx, cancel := context.WithCancel(ctx)
+func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
 	s := &service{
 		id:        id,
 		context:   ctx,
-		processes: make(map[string]rproc.Process),
+		processes: make(map[string]process.Process),
 		events:    make(chan interface{}, 128),
 		ec:        proc.ExitCh,
-		cancel:    cancel,
+		cancel:    shutdown,
 	}
 	go s.processExits()
-	runsc.Monitor = shim.Default
+	runsc.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
-		cancel()
+		shutdown()
 		return nil, errors.Wrap(err, "failed to initialized platform behavior")
 	}
-	go s.forward(publisher)
+	go s.forward(ctx, publisher)
 	return s, nil
 }
 
@@ -99,10 +99,10 @@ type service struct {
 	mu sync.Mutex
 
 	context   context.Context
-	task      rproc.Process
-	processes map[string]rproc.Process
+	task      process.Process
+	processes map[string]process.Process
 	events    chan interface{}
-	platform  rproc.Platform
+	platform  stdio.Platform
 	ec        chan proc.Exit
 
 	id     string
@@ -137,7 +137,7 @@ func newCommand(ctx context.Context, containerdBinary, containerdAddress string)
 	return cmd, nil
 }
 
-func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error) {
+func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error) {
 	cmd, err := newCommand(ctx, containerdBinary, containerdAddress)
 	if err != nil {
 		return "", err
@@ -560,7 +560,7 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
 	s.cancel()
-	os.Exit(0)
+	close(s.events)
 	return empty, nil
 }
 
@@ -697,7 +697,7 @@ func (s *service) checkProcesses(e proc.Exit) {
 	}
 }
 
-func (s *service) allProcesses() (o []rproc.Process) {
+func (s *service) allProcesses() (o []process.Process) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.processes {
@@ -727,18 +727,21 @@ func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 	return pids, nil
 }
 
-func (s *service) forward(publisher events.Publisher) {
+func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
+	ns, _ := namespaces.Namespace(ctx)
+	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
-		ctx, cancel := context.WithTimeout(s.context, 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		err := publisher.Publish(ctx, getTopic(e), e)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Error("post event")
 		}
 	}
+	publisher.Close()
 }
 
-func (s *service) getProcess(execID string) (rproc.Process, error) {
+func (s *service) getProcess(execID string) (process.Process, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if execID == "" {
@@ -773,7 +776,7 @@ func getTopic(e interface{}) string {
 	return runtime.TaskUnknownTopic
 }
 
-func newInit(ctx context.Context, path, workDir, namespace string, platform rproc.Platform, r *proc.CreateConfig, options *options.Options, rootfs string) (*proc.Init, error) {
+func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform, r *proc.CreateConfig, options *options.Options, rootfs string) (*proc.Init, error) {
 	spec, err := utils.ReadSpec(r.Bundle)
 	if err != nil {
 		return nil, errors.Wrap(err, "read oci spec")
@@ -783,7 +786,7 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform rpro
 	}
 	runsc.FormatLogPath(r.ID, options.RunscConfig)
 	runtime := proc.NewRunsc(options.Root, path, namespace, options.BinaryName, options.RunscConfig)
-	p := proc.New(r.ID, runtime, rproc.Stdio{
+	p := proc.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,
@@ -797,6 +800,6 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform rpro
 	p.IoGID = int(options.IoGid)
 	p.Sandbox = utils.IsSandbox(spec)
 	p.UserLog = utils.UserLogPath(spec)
-	p.Monitor = shim.Default
+	p.Monitor = reaper.Default
 	return p, nil
 }

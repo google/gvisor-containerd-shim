@@ -32,11 +32,12 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	rproc "github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	rproc "github.com/containerd/containerd/runtime/proc"
-	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -102,7 +103,7 @@ type Service struct {
 	context   context.Context
 	processes map[string]rproc.Process
 	events    chan interface{}
-	platform  rproc.Platform
+	platform  stdio.Platform
 	ec        chan proc.Exit
 
 	// Filled by Create()
@@ -541,7 +542,7 @@ func getTopic(ctx context.Context, e interface{}) string {
 	return runtime.TaskUnknownTopic
 }
 
-func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, config map[string]string, platform rproc.Platform, r *proc.CreateConfig) (*proc.Init, error) {
+func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, config map[string]string, platform stdio.Platform, r *proc.CreateConfig) (*proc.Init, error) {
 	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -562,7 +563,7 @@ func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, 
 	runsc.FormatLogPath(r.ID, config)
 	rootfs := filepath.Join(path, "rootfs")
 	runtime := proc.NewRunsc(runtimeRoot, path, namespace, r.Runtime, config)
-	p := proc.New(r.ID, runtime, rproc.Stdio{
+	p := proc.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,
@@ -576,6 +577,6 @@ func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, 
 	p.IoGID = int(options.IoGid)
 	p.Sandbox = utils.IsSandbox(spec)
 	p.UserLog = utils.UserLogPath(spec)
-	p.Monitor = shim.Default
+	p.Monitor = reaper.Default
 	return p, nil
 }

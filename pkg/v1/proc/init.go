@@ -31,7 +31,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -61,7 +62,7 @@ type Init struct {
 	id       string
 	Bundle   string
 	console  console.Console
-	Platform proc.Platform
+	Platform stdio.Platform
 	io       runc.IO
 	runtime  *runsc.Runsc
 	status   int
@@ -69,7 +70,7 @@ type Init struct {
 	pid      int
 	closers  []io.Closer
 	stdin    io.Closer
-	stdio    proc.Stdio
+	stdio    stdio.Stdio
 	Rootfs   string
 	IoUID    int
 	IoGID    int
@@ -94,7 +95,7 @@ func NewRunsc(root, path, namespace, runtime string, config map[string]string) *
 }
 
 // New returns a new init process
-func New(id string, runtime *runsc.Runsc, stdio proc.Stdio) *Init {
+func New(id string, runtime *runsc.Runsc, stdio stdio.Stdio) *Init {
 	p := &Init{
 		id:        id,
 		runtime:   runtime,
@@ -154,7 +155,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) (err error) {
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve console master")
 		}
-		console, err = p.Platform.CopyConsole(ctx, console, r.Stdin, r.Stdout, r.Stderr, &p.wg, &copyWaitGroup)
+		console, err = p.Platform.CopyConsole(ctx, console, r.Stdin, r.Stdout, r.Stderr, &p.wg)
 		if err != nil {
 			return errors.Wrap(err, "failed to start console copy")
 		}
@@ -393,7 +394,7 @@ func (p *Init) Runtime() *runsc.Runsc {
 }
 
 // Exec returns a new child process
-func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (process.Process, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -401,7 +402,7 @@ func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 }
 
 // exec returns a new exec'd process
-func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (process.Process, error) {
 	// process exec request
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
@@ -414,7 +415,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 		path:   path,
 		parent: p,
 		spec:   spec,
-		stdio: proc.Stdio{
+		stdio: stdio.Stdio{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -427,7 +428,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 }
 
 // Stdio of the process
-func (p *Init) Stdio() proc.Stdio {
+func (p *Init) Stdio() stdio.Stdio {
 	return p.stdio
 }
 
@@ -455,7 +456,7 @@ func (p *Init) convertStatus(status string) string {
 	return status
 }
 
-func withConditionalIO(c proc.Stdio) runc.IOOpt {
+func withConditionalIO(c stdio.Stdio) runc.IOOpt {
 	return func(o *runc.IOOption) {
 		o.OpenStdin = c.Stdin != ""
 		o.OpenStdout = c.Stdout != ""

@@ -22,7 +22,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/pkg/process"
 	"github.com/pkg/errors"
 )
 
@@ -30,7 +30,7 @@ type initState interface {
 	Resize(console.WinSize) error
 	Start(context.Context) error
 	Delete(context.Context) error
-	Exec(context.Context, string, *ExecConfig) (proc.Process, error)
+	Exec(context.Context, string, *ExecConfig) (process.Process, error)
 	Kill(context.Context, uint32, bool) error
 	SetExited(int)
 }
@@ -96,7 +96,7 @@ func (s *createdState) SetExited(status int) {
 	}
 }
 
-func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (process.Process, error) {
 	return s.p.exec(ctx, path, r)
 }
 
@@ -138,7 +138,7 @@ func (s *runningState) SetExited(status int) {
 	}
 }
 
-func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (process.Process, error) {
 	return s.p.exec(ctx, path, r)
 }
 
@@ -179,6 +179,6 @@ func (s *stoppedState) SetExited(status int) {
 	// no op
 }
 
-func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (process.Process, error) {
 	return nil, errors.Errorf("cannot exec in a stopped state")
 }

@@ -36,9 +36,9 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/v1/linux/proc"
-	containerdshim "github.com/containerd/containerd/runtime/v1/shim"
+	"github.com/containerd/containerd/pkg/process"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -73,7 +73,7 @@ func init() {
 	flag.StringVar(&workdirFlag, "workdir", "", "path used to storge large temporary data")
 	// Containerd default to runc, unless another runtime is explicitly specified.
 	// We keep the same default to make the default behavior consistent.
-	flag.StringVar(&runtimeRootFlag, "runtime-root", proc.RuncRoot, "root directory for the runtime")
+	flag.StringVar(&runtimeRootFlag, "runtime-root", process.RuncRoot, "root directory for the runtime")
 	// currently, the `containerd publish` utility is embedded in the daemon binary.
 	// The daemon invokes `containerd-shim -containerd-binary ...` with its own os.Executable() path.
 	flag.StringVar(&containerdBinaryFlag, "containerd-binary", "containerd", "path to containerd binary (used for `containerd publish`)")
@@ -229,8 +229,7 @@ func setupSignals() (chan os.Signal, error) {
 	signal.Notify(signals, unix.SIGTERM, unix.SIGINT, unix.SIGCHLD, unix.SIGPIPE)
 	// make sure runc is setup to use the monitor
 	// for waiting on processes
-	// TODO(random-liu): Move shim/reaper.go to a separate package.
-	runsc.Monitor = containerdshim.Default
+	runsc.Monitor = reaper.Default
 	// set the shim as the subreaper for all orphaned processes created by the container
 	if err := system.SetSubreaper(1); err != nil {
 		return nil, err
@@ -251,7 +250,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.S
 		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
-				if err := containerdshim.Reap(); err != nil {
+				if err := reaper.Reap(); err != nil {
 					logger.WithError(err).Error("reap exit status")
 				}
 			case unix.SIGTERM, unix.SIGINT:
@@ -305,11 +304,11 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	cmd := exec.CommandContext(ctx, containerdBinaryFlag, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
-	c, err := containerdshim.Default.Start(cmd)
+	c, err := reaper.Default.Start(cmd)
 	if err != nil {
 		return err
 	}
-	status, err := containerdshim.Default.Wait(cmd, c)
+	status, err := reaper.Default.Wait(cmd, c)
 	if err != nil {
 		return err
 	}
