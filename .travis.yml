@@ -26,7 +26,7 @@ before_install:
 
 after_failure:
   - sudo cat /tmp/containerd-cri.log
-  - sudo cat /var/log/*/gvisor.log
+  - sudo grep -H . /var/log/runsc.*.log
 
 script:
   - make test

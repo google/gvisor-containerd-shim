@@ -22,7 +22,7 @@ EOF
 cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.toml
 [runsc_config]
   debug = "true"
-  debug-log = "/var/log/%ID%/gvisor.log"
+  debug-log = "/var/log/runsc.%ID%.%COMMAND%.log"
 EOF
 }
 
