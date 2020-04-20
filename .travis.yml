@@ -25,8 +25,8 @@ before_install:
   - uname -r
 
 after_failure:
-  - journalctl -u containerd
-  - cat /var/log/*/gvisor.log
+  - sudo journalctl -u containerd
+  - sudo cat /var/log/*/gvisor.log
 
 script:
   - make test
