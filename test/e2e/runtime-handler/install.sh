@@ -18,7 +18,15 @@ disabled_plugins = ["restart"]
 EOF
 }
 
-{ # Step 2: Restart containerd
+{ # Step 2: Create gvisor-containerd-shim.toml
+cat <<EOF | sudo tee /etc/containerd/gvisor-containerd-shim.toml
+[runsc_config]
+  debug = "true"
+  debug-log = "/var/log/%ID%/gvisor.log"
+EOF
+}
+
+{ # Step 3: Restart containerd
 sudo pkill containerd
 sudo containerd -log-level debug &> /tmp/containerd-cri.log &
 }

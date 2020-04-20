@@ -24,6 +24,10 @@ addons:
 before_install:
   - uname -r
 
+after_failure:
+  - journalctl -u containerd
+  - cat /var/log/*/gvisor.log
+
 script:
   - make test
   - ./test/e2e/${TEST}/test.sh
