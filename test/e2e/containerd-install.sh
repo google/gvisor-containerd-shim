@@ -42,3 +42,6 @@ cat <<EOF | sudo tee /etc/cni/net.d/99-loopback.conf
 EOF
 
 sudo PATH=$PATH containerd -log-level debug &>/tmp/containerd-cri.log &
+
+# Wait for containerd to start.
+while [ ! -S /run/containerd/containerd.sock ]; do sleep 1; done
