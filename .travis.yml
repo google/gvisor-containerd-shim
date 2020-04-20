@@ -25,7 +25,7 @@ before_install:
   - uname -r
 
 after_failure:
-  - sudo journalctl -u containerd
+  - sudo cat /tmp/containerd-cri.log
   - sudo cat /var/log/*/gvisor.log
 
 script:
