@@ -75,13 +75,19 @@ const configFile = "config.toml"
 
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
+	ep, err := newOOMEpoller(publisher)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithCancel(ctx)
+	go ep.run(ctx)
 	s := &service{
 		id:        id,
 		context:   ctx,
 		processes: make(map[string]rproc.Process),
 		events:    make(chan interface{}, 128),
 		ec:        proc.ExitCh,
+		ep:        ep,
 		cancel:    cancel,
 	}
 	go s.processExits()
@@ -104,9 +110,11 @@ type service struct {
 	events    chan interface{}
 	platform  rproc.Platform
 	ec        chan proc.Exit
+	ep        *epoller
 
 	id     string
 	bundle string
+	cg     cgroups.Cgroup
 	cancel func()
 }
 
@@ -343,6 +351,17 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	// save the main task id and bundle to the shim for additional requests
 	s.id = r.ID
 	s.bundle = r.Bundle
+	pid := process.Pid()
+	if pid > 0 {
+		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
+		if err != nil {
+			logrus.WithError(err).Errorf("loading cgroup for %d", pid)
+		}
+		s.cg = cg
+		if err := s.ep.add(s.id, cg); err != nil {
+			logrus.WithError(err).Error("add cg to OOM monitor")
+		}
+	}
 	s.task = process
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(process.Pid()),
@@ -358,6 +377,13 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	}
 	if err := p.Start(ctx); err != nil {
 		return nil, err
+	}
+	if s.getCgroup() == nil && p.Pid() > 0 {
+		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(p.Pid()))
+		if err != nil {
+			logrus.WithError(err).Errorf("loading cgroup for %d", p.Pid())
+		}
+		s.setCgroup(cg)
 	}
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
@@ -749,6 +775,21 @@ func (s *service) getProcess(execID string) (rproc.Process, error) {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", execID)
 	}
 	return p, nil
+}
+
+func (s *service) getCgroup() cgroups.Cgroup {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cg
+}
+
+func (s *service) setCgroup(cg cgroups.Cgroup) {
+	s.mu.Lock()
+	s.cg = cg
+	s.mu.Unlock()
+	if err := s.ep.add(s.id, cg); err != nil {
+		logrus.WithError(err).Error("add cg to OOM monitor")
+	}
 }
 
 func getTopic(e interface{}) string {
