@@ -87,7 +87,7 @@ func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim,
 		processes: make(map[string]rproc.Process),
 		events:    make(chan interface{}, 128),
 		ec:        proc.ExitCh,
-		ep:        ep,
+		oomPoller: ep,
 		cancel:    cancel,
 	}
 	go s.processExits()
@@ -110,11 +110,10 @@ type service struct {
 	events    chan interface{}
 	platform  rproc.Platform
 	ec        chan proc.Exit
-	ep        *epoller
+	oomPoller *epoller
 
 	id     string
 	bundle string
-	cg     cgroups.Cgroup
 	cancel func()
 }
 
@@ -351,14 +350,16 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	// save the main task id and bundle to the shim for additional requests
 	s.id = r.ID
 	s.bundle = r.Bundle
+
+	// Set up OOM notification on the sandbox's cgroup. This is done on sandbox
+	// create since the sandbox process will be created here.
 	pid := process.Pid()
 	if pid > 0 {
 		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
 		if err != nil {
 			logrus.WithError(err).Errorf("loading cgroup for %d", pid)
 		}
-		s.cg = cg
-		if err := s.ep.add(s.id, cg); err != nil {
+		if err := s.oomPoller.add(s.id, cg); err != nil {
 			logrus.WithError(err).Error("add cg to OOM monitor")
 		}
 	}
@@ -378,13 +379,8 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
-	if s.getCgroup() == nil && p.Pid() > 0 {
-		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(p.Pid()))
-		if err != nil {
-			logrus.WithError(err).Errorf("loading cgroup for %d", p.Pid())
-		}
-		s.setCgroup(cg)
-	}
+	// TODO: Set the cgroup and oom notifications on restore.
+	// https://github.com/google/gvisor-containerd-shim/issues/58
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
 	}, nil
@@ -775,21 +771,6 @@ func (s *service) getProcess(execID string) (rproc.Process, error) {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", execID)
 	}
 	return p, nil
-}
-
-func (s *service) getCgroup() cgroups.Cgroup {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.cg
-}
-
-func (s *service) setCgroup(cg cgroups.Cgroup) {
-	s.mu.Lock()
-	s.cg = cg
-	s.mu.Unlock()
-	if err := s.ep.add(s.id, cg); err != nil {
-		logrus.WithError(err).Error("add cg to OOM monitor")
-	}
 }
 
 func getTopic(e interface{}) string {
