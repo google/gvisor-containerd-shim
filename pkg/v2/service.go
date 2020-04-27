@@ -357,10 +357,10 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	if pid > 0 {
 		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
 		if err != nil {
-			logrus.WithError(err).Errorf("loading cgroup for %d", pid)
+			return nil, errors.Wrapf(err, "loading cgroup for %d", pid)
 		}
 		if err := s.oomPoller.add(s.id, cg); err != nil {
-			logrus.WithError(err).Error("add cg to OOM monitor")
+			return nil, errors.Wrapf(err, "add cg to OOM monitor")
 		}
 	}
 	s.task = process
