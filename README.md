@@ -1,3 +1,7 @@
+> NOTE: This repository is no longer maintained. The gVisor containerd shims are now
+> maintained as part of the core [gVisor](http://www.github.com/google/gvisor/tree/master/shim)
+> repository.
+
 # gvisor-containerd-shim
 
 [![Build Status](https://travis-ci.org/google/gvisor-containerd-shim.svg?branch=master)](https://travis-ci.org/google/gvisor-containerd-shim)
