@@ -182,10 +182,31 @@ type waitResult struct {
 	ExitStatus int    `json:"exitStatus"`
 }
 
+type WaitOpts struct {
+	// RootPID is the pid in the sandbox root PID namespace.
+	RootPID int
+	// PID is the pid in the container's PID namespace.
+	PID     int
+}
+
+func (o *WaitOpts) args() (out []string) {
+	if o.RootPID > 0 {
+		out = append(out, "--rootpid", strconv.Itoa(o.RootPID))
+	}
+	if o.PID > 0 {
+		out = append(out, "--pid", strconv.Itoa(o.PID))
+	}
+
+	return out
+}
+
 // Wait will wait for a running container, and return its exit status.
-// TODO(random-liu): Add exec process support.
-func (r *Runsc) Wait(context context.Context, id string) (int, error) {
-	data, err := cmdOutput(r.command(context, "wait", id), true)
+func (r *Runsc) Wait(context context.Context, id string, opts *WaitOpts) (int, error) {
+	args := []string{"wait"}
+	if opts != nil {
+		args = append(args, opts.args()...)
+	}
+	data, err := cmdOutput(r.command(context, append(args, id)...), true)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %s", err, data)
 	}

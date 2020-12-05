@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -205,13 +206,6 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if socket != nil {
 		opts.ConsoleSocket = socket
 	}
-	eventCh := e.parent.Monitor.Subscribe()
-	defer func() {
-		// Unsubscribe if an error is returned.
-		if err != nil {
-			e.parent.Monitor.Unsubscribe(eventCh)
-		}
-	}()
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		close(e.waitBlock)
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
@@ -251,19 +245,30 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		return errors.Wrap(err, "failed to retrieve OCI runtime exec internal pid")
 	}
 	e.internalPid = internalPid
+
 	go func() {
-		defer e.parent.Monitor.Unsubscribe(eventCh)
-		for event := range eventCh {
-			if event.Pid == e.pid {
-				ExitCh <- Exit{
-					Timestamp: event.Timestamp,
-					ID:        e.id,
-					Status:    event.Status,
-				}
-				break
+		waitOpts := &runsc.WaitOpts{}
+		if e.parent.Sandbox {
+			waitOpts.RootPID = e.internalPid
+		} else {
+			waitOpts.PID = e.internalPid
+		}
+
+		status, err := e.parent.runtime.Wait(context.Background(), e.parent.id, waitOpts)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("Failed to wait for container %q, process %q", e.parent.id, e.internalPid)
+			if err := e.kill(ctx, uint32(syscall.SIGKILL), false); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to kill container %q, process %q", e.parent.id, e.internalPid)
 			}
+			status = internalErrorCode
+		}
+		ExitCh <- Exit{
+			Timestamp: time.Now(),
+			ID:        e.id,
+			Status:    status,
 		}
 	}()
+
 	return nil
 }
 
